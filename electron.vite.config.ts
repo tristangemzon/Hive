@@ -25,8 +25,11 @@ export default defineConfig({
       alias: { '@shared': resolve('src/shared') },
     },
     build: {
+      // Output as CJS so Electron loads it as index.js (not index.mjs).
+      lib: { entry: resolve('src/preload/index.ts'), formats: ['cjs'] },
       rollupOptions: {
         input: { index: resolve('src/preload/index.ts') },
+        output: { entryFileNames: '[name].js' },
       },
     },
   },
