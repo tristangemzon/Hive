@@ -4,9 +4,11 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['libsodium-wrappers-sumo'] })],
     resolve: {
       alias: {
+        // Point directly at the CJS build to bypass the broken ESM entry.
+        'libsodium-wrappers-sumo': resolve('node_modules/libsodium-wrappers-sumo/dist/modules-sumo/libsodium-wrappers.js'),
         '@shared': resolve('src/shared'),
         '@main': resolve('src/main'),
       },
