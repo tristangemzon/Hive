@@ -119,7 +119,7 @@ function createDashboardWindow(): BrowserWindow {
   });
 
   if (IS_DEV) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'] ?? 'http://localhost:5173/dashboard.html');
+    win.loadURL(`${process.env['ELECTRON_RENDERER_URL'] ?? 'http://localhost:5173'}/dashboard.html`);
     win.webContents.openDevTools();
   } else {
     win.loadFile(join(__dirname, '../renderer/dashboard.html'));
