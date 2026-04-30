@@ -48,6 +48,7 @@ function dispatch(srv: HiveServer, db: Db, peerId: string, msg: ClientMessage): 
     case 'getHistory':      return handleGetHistory(srv, db, peerId, msg);
     case 'getRoomHistory':  return handleGetRoomHistory(srv, db, peerId, msg);
     case 'talkSignal':      return handleTalkSignal(srv, peerId, msg);
+    case 'gameSignal':      return handleGameSignal(srv, peerId, msg);
     default:
       // Exhaustiveness guard — unknown message type, ignore silently.
       break;
@@ -408,6 +409,20 @@ function handleTalkSignal(
     callId: msg.callId,
     signal: msg.signal,
     payload: msg.payload,
+  });
+}
+
+function handleGameSignal(
+  srv: HiveServer,
+  peerId: string,
+  msg: import('@shared/types.js').CliGameSignal,
+): void {
+  srv.send(msg.to, {
+    type: 'gameSignal',
+    from: peerId,
+    action: msg.action,
+    kind: msg.kind,
+    ...(msg.path ? { path: msg.path } : {}),
   });
 }
 

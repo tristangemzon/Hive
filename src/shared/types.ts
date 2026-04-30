@@ -55,6 +55,8 @@ export type SrvError = { type: 'error'; code: string; message: string };
 
 // Talk signalling relayed as-is (server never reads payload)
 export type SrvTalkSignal = { type: 'talkSignal'; from: string; callId: string; signal: string; payload: unknown };
+// Game signalling relayed as-is (server never reads payload)
+export type SrvGameSignal = { type: 'gameSignal'; from: string; action: string; kind: string; path?: number[] };
 export type SrvRoomMemberJoin = { type: 'roomMemberJoin'; roomId: string; peerId: string; screenName: string };
 export type SrvRoomMemberLeave = { type: 'roomMemberLeave'; roomId: string; peerId: string };
 
@@ -73,6 +75,7 @@ export type ServerMessage =
   | SrvRoomList
   | SrvError
   | SrvTalkSignal
+  | SrvGameSignal
   | SrvRoomMemberJoin
   | SrvRoomMemberLeave;
 
@@ -119,6 +122,8 @@ export type CliGetRoomHistory = { type: 'getRoomHistory'; roomId: string; channe
 export type CliRoomChannelAdd = { type: 'roomChannelAdd'; roomId: string; channelId: string; name: string; kind: 'text' | 'voice' };
 // Talk signalling — relayed as-is to target peer
 export type CliTalkSignal = { type: 'talkSignal'; to: string; callId: string; signal: string; payload: unknown };
+// Game signalling — relayed as-is to target peer
+export type CliGameSignal = { type: 'gameSignal'; to: string; action: string; kind: string; path?: number[] };
 
 export type ClientMessage =
   | CliAuth
@@ -135,7 +140,8 @@ export type ClientMessage =
   | CliGetHistory
   | CliGetRoomHistory
   | CliRoomChannelAdd
-  | CliTalkSignal;
+  | CliTalkSignal
+  | CliGameSignal;
 
 // ── Shared entity types ──────────────────────────────────────────────────────
 
