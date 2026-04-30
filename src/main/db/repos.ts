@@ -252,6 +252,8 @@ export function listHiveRooms(db: Db): HiveRoom[] {
   return rows.map((r) => {
     const memberCount = (db.prepare('SELECT COUNT(*) as n FROM room_members WHERE room_id = ?').get(r.id) as { n: number }).n;
     const messageCount = (db.prepare('SELECT COUNT(*) as n FROM room_messages WHERE room_id = ?').get(r.id) as { n: number }).n;
-    return { id: r.id, name: r.name, memberCount, messageCount };
+    const textChannels = (db.prepare("SELECT COUNT(*) as n FROM room_channels WHERE room_id = ? AND kind = 'text'").get(r.id) as { n: number }).n;
+    const voiceChannels = (db.prepare("SELECT COUNT(*) as n FROM room_channels WHERE room_id = ? AND kind = 'voice'").get(r.id) as { n: number }).n;
+    return { id: r.id, name: r.name, memberCount, messageCount, textChannels, voiceChannels };
   });
 }

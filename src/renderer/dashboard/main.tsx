@@ -19,68 +19,266 @@ declare global {
   }
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ── AIM 5.x-style CSS ────────────────────────────────────────────────────────
 
 const css = `
+  *, *::before, *::after { box-sizing: border-box; }
   :root {
-    --bg: #1a1a2e;
-    --surface: #16213e;
-    --accent: #0f3460;
-    --green: #4caf50;
-    --red: #f44336;
-    --text: #e0e0e0;
-    --muted: #888;
-    --border: #2a2a4e;
+    --font-ui: "Lucida Grande", Tahoma, "MS Sans Serif", sans-serif;
+    --c-bg: #ece9d8;
+    --c-panel: #f5f4ea;
+    --c-bevel-light: #ffffff;
+    --c-bevel-dark: #7a7a7a;
+    --c-bevel-darker: #404040;
+    --c-title: #0a246a;
+    --c-title-text: #ffffff;
+    --c-yellow: #ffd44f;
+    --c-input-bg: #ffffff;
+    --c-text: #000000;
+    --c-muted: #666666;
+    --c-group-bg: #d6d3c1;
+    --c-row-hover: #e8eef8;
+    --c-selected: #316ac5;
+    --c-border: #c0bfb1;
+    --c-green: #2cc14a;
+    --c-away: #f4b400;
+    --c-offline: #888888;
   }
-  body { background: var(--bg); color: var(--text); }
-  .dashboard { display: flex; flex-direction: column; height: 100vh; }
-  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 12px; }
-  .header h1 { font-size: 18px; font-weight: 600; letter-spacing: 1px; color: #e040fb; }
-  .status-dot { width: 10px; height: 10px; border-radius: 50%; }
-  .status-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .status-dot.offline { background: var(--red); }
-  .header-actions { margin-left: auto; display: flex; gap: 8px; }
-  .btn { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
-  .btn-start { background: var(--green); color: #fff; }
-  .btn-stop { background: var(--red); color: #fff; }
-  .btn-settings { background: var(--accent); color: #fff; }
-  .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
-  .stat { background: var(--surface); padding: 12px 16px; }
-  .stat-value { font-size: 22px; font-weight: 700; color: #e040fb; }
-  .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .content { display: grid; grid-template-columns: 1fr 1fr; gap: 0; flex: 1; overflow: hidden; }
-  .panel { padding: 16px; overflow-y: auto; border-right: 1px solid var(--border); }
-  .panel h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 12px; }
-  .user-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; margin-bottom: 4px; background: var(--surface); }
-  .user-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .user-name { font-size: 13px; font-weight: 500; }
-  .user-id { font-size: 10px; color: var(--muted); margin-left: auto; font-family: monospace; }
-  .room-row { padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; background: var(--surface); }
-  .room-name { font-size: 13px; font-weight: 500; }
-  .room-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .empty { color: var(--muted); font-size: 12px; padding: 8px 0; }
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 24px; width: 380px; }
-  .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
-  .field { margin-bottom: 14px; }
-  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .field input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px; outline: none; }
-  .field input:focus { border-color: #e040fb; }
-  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-  .btn-cancel { background: var(--accent); color: #fff; }
-  .btn-save { background: #e040fb; color: #fff; }
+  html, body, #root {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+  .window {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    border: 2px solid;
+    border-color: var(--c-bevel-light) var(--c-bevel-darker) var(--c-bevel-darker) var(--c-bevel-light);
+  }
+  /* ── Title bar ── */
+  .titlebar {
+    background: linear-gradient(to bottom, #1a3da9 0%, #0a246a 100%);
+    color: var(--c-title-text);
+    padding: 3px 4px 3px 6px;
+    font-weight: bold;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    -webkit-app-region: drag;
+  }
+  .titlebar .runner {
+    width: 14px; height: 14px;
+    background: var(--c-yellow);
+    border: 1px solid #000;
+    border-radius: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    flex-shrink: 0;
+  }
+  .titlebar .title { flex: 1; }
+  .titlebar .tb-actions {
+    display: flex; gap: 4px; align-items: center;
+    -webkit-app-region: no-drag;
+  }
+  .tb-btn {
+    padding: 1px 8px; height: 18px;
+    font-family: var(--font-ui); font-size: 11px;
+    background: var(--c-panel);
+    border: 1px solid;
+    border-color: var(--c-bevel-light) var(--c-bevel-darker) var(--c-bevel-darker) var(--c-bevel-light);
+    cursor: pointer;
+    color: var(--c-text);
+    -webkit-app-region: no-drag;
+  }
+  .tb-btn:active {
+    border-color: var(--c-bevel-darker) var(--c-bevel-light) var(--c-bevel-light) var(--c-bevel-darker);
+  }
+  .tb-btn.danger { color: #990000; }
+  /* ── Status bar ── */
+  .statusbar {
+    background: var(--c-panel);
+    border-top: 1px solid var(--c-border);
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--c-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .statusbar .dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  }
+  .statusbar .dot.online { background: var(--c-green); }
+  .statusbar .dot.offline { background: var(--c-offline); }
+  /* ── Toolbar strip below titlebar ── */
+  .toolbar {
+    background: var(--c-panel);
+    border-bottom: 1px solid var(--c-border);
+    padding: 3px 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    font-size: 11px;
+  }
+  .toolbar button {
+    font-family: var(--font-ui); font-size: 11px;
+    background: var(--c-panel);
+    border: 1px solid;
+    border-color: var(--c-bevel-light) var(--c-bevel-darker) var(--c-bevel-darker) var(--c-bevel-light);
+    padding: 2px 10px;
+    cursor: pointer;
+  }
+  .toolbar button:active {
+    border-color: var(--c-bevel-darker) var(--c-bevel-light) var(--c-bevel-light) var(--c-bevel-darker);
+  }
+  .toolbar .sep { width: 1px; height: 16px; background: var(--c-border); margin: 0 2px; }
+  /* ── Scrollable body ── */
+  .body { flex: 1; overflow-y: auto; background: var(--c-input-bg); }
+  /* ── Group headers ── */
+  .group-header {
+    background: var(--c-group-bg);
+    padding: 2px 6px 2px 4px;
+    font-weight: bold;
+    font-size: 11px;
+    border-bottom: 1px solid #aaa;
+    border-top: 1px solid var(--c-bevel-light);
+    cursor: default;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .group-header .chevron { font-size: 9px; color: #555; }
+  .group-header .count { font-weight: normal; color: var(--c-muted); font-size: 10px; }
+  /* ── User rows ── */
+  .user-row {
+    padding: 2px 8px 2px 18px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: default;
+    font-size: 12px;
+  }
+  .user-row:hover { background: var(--c-row-hover); }
+  .user-row .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .user-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-row .tag {
+    font-size: 10px; color: var(--c-muted);
+    font-style: italic;
+  }
+  /* ── Room rows ── */
+  .room-row {
+    padding: 3px 8px 3px 18px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: default;
+    font-size: 12px;
+  }
+  .room-row:hover { background: var(--c-row-hover); }
+  .room-row .room-icon { font-size: 11px; flex-shrink: 0; }
+  .room-row .room-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .room-row .room-channels {
+    font-size: 10px; color: var(--c-muted);
+    white-space: nowrap;
+  }
+  .room-row .room-members {
+    font-size: 10px; color: var(--c-muted);
+    margin-left: 4px;
+    white-space: nowrap;
+  }
+  /* ── Settings modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal {
+    background: var(--c-bg);
+    border: 2px solid;
+    border-color: var(--c-bevel-light) var(--c-bevel-darker) var(--c-bevel-darker) var(--c-bevel-light);
+    width: 340px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+  }
+  .modal-title {
+    background: linear-gradient(to bottom, #1a3da9 0%, #0a246a 100%);
+    color: #fff;
+    font-weight: bold;
+    font-size: 11px;
+    padding: 3px 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .modal-body { padding: 12px 14px; }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; margin-bottom: 3px; }
+  .field input {
+    width: 100%;
+    border: 2px solid;
+    border-color: var(--c-bevel-darker) var(--c-bevel-light) var(--c-bevel-light) var(--c-bevel-darker);
+    padding: 3px 5px;
+    background: var(--c-input-bg);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    outline: none;
+  }
+  .modal-footer {
+    padding: 6px 10px;
+    background: var(--c-panel);
+    border-top: 1px solid var(--c-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .modal-footer button {
+    font-family: var(--font-ui); font-size: 12px;
+    background: var(--c-panel);
+    border: 1px solid;
+    border-color: var(--c-bevel-light) var(--c-bevel-darker) var(--c-bevel-darker) var(--c-bevel-light);
+    padding: 3px 16px;
+    cursor: pointer;
+    min-width: 64px;
+  }
+  .modal-footer button:active {
+    border-color: var(--c-bevel-darker) var(--c-bevel-light) var(--c-bevel-light) var(--c-bevel-darker);
+  }
+  .empty-row {
+    padding: 3px 18px;
+    color: var(--c-muted);
+    font-style: italic;
+    font-size: 11px;
+  }
 `;
 
-function statusColor(status: string): string {
+function statusDotColor(status: string, connected: boolean): string {
+  if (!connected) return 'var(--c-offline)';
   switch (status) {
-    case 'online': return '#4caf50';
-    case 'away': case 'idle': return '#ff9800';
-    case 'invisible': return '#9e9e9e';
-    default: return '#555';
+    case 'online': return 'var(--c-green)';
+    case 'away': case 'idle': return 'var(--c-away)';
+    case 'invisible': return '#aaaaaa';
+    default: return 'var(--c-offline)';
   }
 }
 
-// ── Components ────────────────────────────────────────────────────────────────
+// ── Settings Modal ────────────────────────────────────────────────────────────
 
 function SettingsModal({ config, onSave, onClose }: {
   config: HiveConfig;
@@ -94,30 +292,36 @@ function SettingsModal({ config, onSave, onClose }: {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <h2>Server Settings</h2>
-        <div className="field">
-          <label>Port</label>
-          <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="7700" />
+        <div className="modal-title">
+          <span style={{ background: '#ffd44f', width: 12, height: 12, display: 'inline-block', border: '1px solid #000', borderRadius: 2, fontSize: 8, textAlign: 'center', lineHeight: '12px' }}>🐝</span>
+          Hive — Server Settings
         </div>
-        <div className="field">
-          <label>TLS Cert Path (leave blank for auto-generated)</label>
-          <input value={certPath} onChange={(e) => setCertPath(e.target.value)} placeholder="/path/to/cert.pem" />
+        <div className="modal-body">
+          <div className="field">
+            <label>Listen Port</label>
+            <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="7700" />
+          </div>
+          <div className="field">
+            <label>TLS Certificate Path <span style={{ color: 'var(--c-muted)', fontWeight: 'normal' }}>(blank = auto-generated)</span></label>
+            <input value={certPath} onChange={(e) => setCertPath(e.target.value)} placeholder="/path/to/cert.pem" />
+          </div>
+          <div className="field">
+            <label>TLS Key Path <span style={{ color: 'var(--c-muted)', fontWeight: 'normal' }}>(blank = auto-generated)</span></label>
+            <input value={keyPath} onChange={(e) => setKeyPath(e.target.value)} placeholder="/path/to/key.pem" />
+          </div>
         </div>
-        <div className="field">
-          <label>TLS Key Path (leave blank for auto-generated)</label>
-          <input value={keyPath} onChange={(e) => setKeyPath(e.target.value)} placeholder="/path/to/key.pem" />
-        </div>
-        <div className="modal-actions">
-          <button className="btn btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="btn btn-save" onClick={() => {
-            onSave({ port: parseInt(port, 10) || 7700, certPath, keyPath });
-            onClose();
-          }}>Save</button>
+        <div className="modal-footer">
+          <button onClick={onClose}>Cancel</button>
+          <button onClick={() => { onSave({ port: parseInt(port, 10) || 7700, certPath, keyPath }); onClose(); }}>
+            Save
+          </button>
         </div>
       </div>
     </div>
   );
 }
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 
 function Dashboard() {
   const [stats, setStats] = useState<HiveStats | null>(null);
@@ -145,86 +349,108 @@ function Dashboard() {
     const unsub = window.hiveApi.onStatus((running) => {
       setStats((prev) => prev ? { ...prev, running } : null);
     });
-    return () => {
-      clearInterval(interval);
-      unsub();
-    };
+    return () => { clearInterval(interval); unsub(); };
   }, [refresh]);
 
-  async function handleStart() {
-    await window.hiveApi.start();
-    await refresh();
-  }
-  async function handleStop() {
-    await window.hiveApi.stop();
-    await refresh();
-  }
+  async function handleStart() { await window.hiveApi.start(); await refresh(); }
+  async function handleStop() { await window.hiveApi.stop(); await refresh(); }
   async function handleSaveConfig(cfg: HiveConfig) {
     await window.hiveApi.setConfig(cfg);
     setConfig(cfg);
   }
 
   const running = stats?.running ?? false;
+  const connectedUsers = users.filter((u) => u.connected);
+  const offlineUsers = users.filter((u) => !u.connected);
+  const port = stats?.port ?? config.port;
 
   return (
-    <div className="dashboard">
+    <div className="window">
       <style>{css}</style>
-      <header className="header">
-        <h1>🐝 HIVE</h1>
-        <span className={`status-dot ${running ? 'online' : 'offline'}`} />
-        <span style={{ fontSize: 12, color: running ? '#4caf50' : '#f44336' }}>
-          {running ? `Running on :${stats?.port ?? config.port}` : 'Stopped'}
-        </span>
-        <div className="header-actions">
-          {running
-            ? <button className="btn btn-stop" onClick={handleStop}>Stop</button>
-            : <button className="btn btn-start" onClick={handleStart}>Start</button>
-          }
-          <button className="btn btn-settings" onClick={() => setShowSettings(true)}>⚙ Settings</button>
-        </div>
-      </header>
 
-      <div className="stats-bar">
-        <div className="stat">
-          <div className="stat-value">{stats?.connectedUsers ?? 0}</div>
-          <div className="stat-label">Connected</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{stats?.totalUsers ?? 0}</div>
-          <div className="stat-label">Total Users</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{stats?.totalRooms ?? 0}</div>
-          <div className="stat-label">Rooms</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{stats?.totalMessages ?? 0}</div>
-          <div className="stat-label">Messages</div>
+      {/* Title bar */}
+      <div className="titlebar">
+        <span className="runner">🐝</span>
+        <span className="title">Hive</span>
+        <div className="tb-actions">
+          {running
+            ? <button className="tb-btn danger" onClick={handleStop}>Stop Server</button>
+            : <button className="tb-btn" onClick={handleStart}>Start Server</button>
+          }
+          <button className="tb-btn" onClick={() => setShowSettings(true)}>⚙</button>
         </div>
       </div>
 
-      <div className="content">
-        <div className="panel">
-          <h2>Users ({users.length})</h2>
-          {users.length === 0 && <div className="empty">No users registered yet.</div>}
-          {users.map((u) => (
-            <div className="user-row" key={u.peerId}>
-              <span className="dot" style={{ background: u.connected ? statusColor(u.status) : '#555' }} />
-              <span className="user-name">{u.screenName}</span>
-              <span className="user-id">{u.peerId.slice(0, 16)}…</span>
-            </div>
-          ))}
+      {/* Scrollable body */}
+      <div className="body">
+
+        {/* ── Online clients ── */}
+        <div className="group-header">
+          <span className="chevron">▼</span>
+          Online
+          <span className="count">({connectedUsers.length}/{users.length})</span>
         </div>
-        <div className="panel">
-          <h2>Rooms ({rooms.length})</h2>
-          {rooms.length === 0 && <div className="empty">No rooms created yet.</div>}
-          {rooms.map((r) => (
+        {connectedUsers.length === 0 && (
+          <div className="empty-row">No clients connected</div>
+        )}
+        {connectedUsers.map((u) => (
+          <div className="user-row" key={u.peerId}>
+            <span className="status-dot" style={{ background: statusDotColor(u.status, true) }} />
+            <span className="name">{u.screenName}</span>
+            {u.status !== 'online' && <span className="tag">{u.status}</span>}
+          </div>
+        ))}
+
+        {/* ── Offline clients (collapsed-style) ── */}
+        {offlineUsers.length > 0 && (
+          <>
+            <div className="group-header">
+              <span className="chevron">▶</span>
+              Offline
+              <span className="count">({offlineUsers.length})</span>
+            </div>
+            {offlineUsers.map((u) => (
+              <div className="user-row" key={u.peerId} style={{ color: 'var(--c-muted)' }}>
+                <span className="status-dot" style={{ background: 'var(--c-offline)' }} />
+                <span className="name">{u.screenName}</span>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── Chat Rooms ── */}
+        <div className="group-header">
+          <span className="chevron">▼</span>
+          Chat Rooms
+          <span className="count">({rooms.length})</span>
+        </div>
+        {rooms.length === 0 && (
+          <div className="empty-row">No rooms created yet</div>
+        )}
+        {rooms.map((r) => {
+          const chParts: string[] = [];
+          if (r.textChannels > 0) chParts.push(`${r.textChannels} text`);
+          if (r.voiceChannels > 0) chParts.push(`${r.voiceChannels} voice`);
+          const chLabel = chParts.length > 0 ? chParts.join(', ') : 'no channels';
+          return (
             <div className="room-row" key={r.id}>
-              <div className="room-name">{r.name}</div>
-              <div className="room-meta">{r.memberCount} members · {r.messageCount} messages</div>
+              <span className="room-icon">💬</span>
+              <span className="room-name">{r.name}</span>
+              <span className="room-channels">{chLabel}</span>
+              <span className="room-members">· {r.memberCount} member{r.memberCount !== 1 ? 's' : ''}</span>
             </div>
-          ))}
-        </div>
+          );
+        })}
+
+      </div>
+
+      {/* Status bar */}
+      <div className="statusbar">
+        <span className={`dot ${running ? 'online' : 'offline'}`} />
+        {running
+          ? <>Server running on :{port} &nbsp;·&nbsp; {connectedUsers.length} connected &nbsp;·&nbsp; {rooms.length} room{rooms.length !== 1 ? 's' : ''}</>
+          : 'Server stopped'
+        }
       </div>
 
       {showSettings && (

@@ -199,4 +199,6 @@ export type HiveRoom = {
   name: string;
   memberCount: number;
   messageCount: number;
+  textChannels: number;
+  voiceChannels: number;
 };
