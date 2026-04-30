@@ -266,6 +266,45 @@ const css = `
     font-style: italic;
     font-size: 11px;
   }
+  /* ── Connect URL strip ── */
+  .url-strip {
+    background: var(--c-panel);
+    border-bottom: 1px solid var(--c-border);
+    padding: 3px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    font-size: 11px;
+  }
+  .url-strip label { color: var(--c-muted); white-space: nowrap; }
+  .url-strip .url-box {
+    flex: 1;
+    border: 2px solid;
+    border-color: var(--c-bevel-darker) var(--c-bevel-light) var(--c-bevel-light) var(--c-bevel-darker);
+    background: var(--c-input-bg);
+    padding: 1px 5px;
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--c-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: text;
+  }
+  .url-strip .copy-btn {
+    font-family: var(--font-ui); font-size: 11px;
+    background: var(--c-panel);
+    border: 1px solid;
+    border-color: var(--c-bevel-light) var(--c-bevel-darker) var(--c-bevel-darker) var(--c-bevel-light);
+    padding: 1px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .url-strip .copy-btn:active {
+    border-color: var(--c-bevel-darker) var(--c-bevel-light) var(--c-bevel-light) var(--c-bevel-darker);
+  }
+  .url-strip .copy-btn.copied { color: #1a7a1a; }
 `;
 
 function statusDotColor(status: string, connected: boolean): string {
@@ -363,6 +402,14 @@ function Dashboard() {
   const connectedUsers = users.filter((u) => u.connected);
   const offlineUsers = users.filter((u) => !u.connected);
   const port = stats?.port ?? config.port;
+  const connectUrl = `wss://localhost:${port}`;
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    void navigator.clipboard.writeText(connectUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
 
   return (
     <div className="window">
@@ -379,6 +426,15 @@ function Dashboard() {
           }
           <button className="tb-btn" onClick={() => setShowSettings(true)}>⚙</button>
         </div>
+      </div>
+
+      {/* Connect URL strip */}
+      <div className="url-strip">
+        <label>Connect URL:</label>
+        <div className="url-box">{connectUrl}</div>
+        <button className={`copy-btn${copied ? ' copied' : ''}`} onClick={handleCopy}>
+          {copied ? '✓ Copied' : 'Copy'}
+        </button>
       </div>
 
       {/* Scrollable body */}
