@@ -1,5 +1,5 @@
 import type { Db } from './open.js';
-import type { UserStatus, BuddyEntry, BuddyRequest, RoomEntry, ChannelEntry, HiveUser, HiveRoom } from '@shared/types.js';
+import type { UserStatus, BuddyEntry, BuddyRequest, RoomEntry, ChannelEntry, HiveUser, HiveRoom, HiveBannedUser } from '@shared/types.js';
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
@@ -17,6 +17,51 @@ export function upsertUser(
       pub_key_b64 = excluded.pub_key_b64,
       last_seen   = excluded.last_seen
   `).run(peerId, screenName, pubKeyB64, Date.now(), Date.now());
+}
+
+/**
+ * Register a new account. Inserts the user row with encrypted_keystore and
+ * registered_at set. Throws if peer_id already exists.
+ */
+export function registerUser(
+  db: Db,
+  peerId: string,
+  screenName: string,
+  pubKeyB64: string,
+  encryptedKeystoreB64: string,
+): void {
+  db.prepare(`
+    INSERT INTO users (peer_id, screen_name, pub_key_b64, encrypted_keystore, registered_at, last_seen, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(peerId, screenName, pubKeyB64, encryptedKeystoreB64, Date.now(), Date.now(), Date.now());
+}
+
+/** Returns true if the screen name is already in use (case-insensitive). */
+export function isScreenNameTaken(db: Db, screenName: string): boolean {
+  return !!db.prepare('SELECT 1 FROM users WHERE LOWER(screen_name) = LOWER(?)').get(screenName);
+}
+
+/** Returns all registered users (those with registered_at set). */
+export function listRegisteredUsers(db: Db): Array<{ screenName: string; peerId: string }> {
+  const rows = db.prepare(
+    'SELECT screen_name, peer_id FROM users WHERE registered_at IS NOT NULL ORDER BY screen_name ASC',
+  ).all() as Array<{ screen_name: string; peer_id: string }>;
+  return rows.map((r) => ({ screenName: r.screen_name, peerId: r.peer_id }));
+}
+
+/** Returns the encrypted keystore blob (base64) for a given screen name, or null. */
+export function getEncryptedKeystore(db: Db, screenName: string): string | null {
+  const row = db.prepare(
+    'SELECT encrypted_keystore FROM users WHERE LOWER(screen_name) = LOWER(?)',
+  ).get(screenName) as { encrypted_keystore: string | null } | undefined;
+  return row?.encrypted_keystore ?? null;
+}
+
+/** Returns true if the peer has a fully registered account (registered_at IS NOT NULL). */
+export function isUserRegistered(db: Db, peerId: string): boolean {
+  return !!db.prepare(
+    'SELECT 1 FROM users WHERE peer_id = ? AND registered_at IS NOT NULL',
+  ).get(peerId);
 }
 
 export function getUser(db: Db, peerId: string): { peerId: string; screenName: string; pubKeyB64: string; status: UserStatus; awayMessage: string | null } | null {
@@ -38,6 +83,7 @@ export function listUsers(db: Db): HiveUser[] {
     status: r.status as UserStatus,
     connected: false, // filled in by caller
     lastSeen: r.last_seen,
+    banned: false, // filled in by caller
   }));
 }
 
@@ -165,6 +211,10 @@ export function countMessages(db: Db): number {
   return (db.prepare('SELECT COUNT(*) as n FROM messages').get() as { n: number }).n;
 }
 
+export function countUndeliveredAll(db: Db): number {
+  return (db.prepare('SELECT COUNT(*) as n FROM messages WHERE delivered = 0').get() as { n: number }).n;
+}
+
 // ── Rooms ────────────────────────────────────────────────────────────────────
 
 export function createRoom(db: Db, id: string, name: string, createdBy: string): void {
@@ -256,4 +306,46 @@ export function listHiveRooms(db: Db): HiveRoom[] {
     const voiceChannels = (db.prepare("SELECT COUNT(*) as n FROM room_channels WHERE room_id = ? AND kind = 'voice'").get(r.id) as { n: number }).n;
     return { id: r.id, name: r.name, memberCount, messageCount, textChannels, voiceChannels };
   });
+}
+
+// ── Ban list ──────────────────────────────────────────────────────────────────
+
+export function banUser(db: Db, peerId: string, reason = ''): void {
+  db.prepare('INSERT OR REPLACE INTO banned_users (peer_id, banned_at, reason) VALUES (?, ?, ?)')
+    .run(peerId, Date.now(), reason);
+}
+
+export function unbanUser(db: Db, peerId: string): void {
+  db.prepare('DELETE FROM banned_users WHERE peer_id = ?').run(peerId);
+}
+
+export function isBanned(db: Db, peerId: string): boolean {
+  return !!db.prepare('SELECT 1 FROM banned_users WHERE peer_id = ?').get(peerId);
+}
+
+export function listBannedUsers(db: Db): HiveBannedUser[] {
+  const rows = db.prepare(`
+    SELECT b.peer_id, u.screen_name, b.banned_at, b.reason
+    FROM banned_users b
+    LEFT JOIN users u ON u.peer_id = b.peer_id
+    ORDER BY b.banned_at DESC
+  `).all() as Array<{ peer_id: string; screen_name: string | null; banned_at: number; reason: string | null }>;
+  return rows.map((r) => ({
+    peerId: r.peer_id,
+    screenName: r.screen_name ?? r.peer_id.slice(0, 12),
+    bannedAt: r.banned_at,
+    reason: r.reason ?? '',
+  }));
+}
+
+/** Remove a user account and all associated data (buddy links, requests, room memberships). */
+export function deleteUser(db: Db, peerId: string): void {
+  db.prepare('DELETE FROM buddy_relationships WHERE peer_id_a = ? OR peer_id_b = ?').run(peerId, peerId);
+  db.prepare('DELETE FROM buddy_requests WHERE from_peer_id = ? OR to_peer_id = ?').run(peerId, peerId);
+  db.prepare('DELETE FROM room_members WHERE peer_id = ?').run(peerId);
+  db.prepare('DELETE FROM users WHERE peer_id = ?').run(peerId);
+}
+
+export function countBanned(db: Db): number {
+  return (db.prepare('SELECT COUNT(*) as n FROM banned_users').get() as { n: number }).n;
 }

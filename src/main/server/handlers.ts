@@ -63,7 +63,9 @@ function handleAuth(
   peerId: string,
   msg: import('@shared/types.js').CliAuth,
 ): void {
-  repos.upsertUser(db, peerId, msg.screenName, msg.pubKeyB64);
+  // The WS layer already verified the signature and confirmed the peer is
+  // registered (registered_at IS NOT NULL). Here we just update status and
+  // deliver the buddy list + pending messages.
   repos.setUserStatus(db, peerId, 'online');
 
   const buddies = repos.listBuddyEntries(db, peerId);
@@ -83,6 +85,11 @@ function handleAuth(
     pendingRequests,
     pubKeys,
   });
+
+  // Send MOTD if configured.
+  if (srv.motd) {
+    srv.send(peerId, { type: 'announce', text: srv.motd, ts: Date.now() });
+  }
 
   // Deliver unread messages.
   const undelivered = repos.listUndelivered(db, peerId);

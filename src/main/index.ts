@@ -44,19 +44,27 @@ app.whenReady().then(async () => {
   // Register IPC (no server yet — will be updated on start).
   registerIpcHandlers(null, db, config);
 
-  // Override setConfig to also persist to disk.
+  // Override setConfig to also persist to disk and update running server.
   ipcMain.removeHandler(IPC.HiveSetConfig);
   ipcMain.handle(IPC.HiveSetConfig, (_event, cfg: HiveConfig) => {
     saveConfig(cfg);
     registerIpcHandlers(hiveServer, db, cfg);
     updateServer(hiveServer);
+    hiveServer?.setMotd(cfg.motd ?? '');
+    hiveServer?.setRegistrationOpen(cfg.registrationOpen ?? true);
   });
 
   // Start/stop server via IPC from dashboard.
   ipcMain.handle(IPC.HiveStart, async () => {
-    if (hiveServer) return;
-    const cert = getCertBundle(config.certPath || undefined, config.keyPath || undefined);
-    hiveServer = new HiveServer(db, config.port, cert);
+    if (hiveServer) {
+      if (mainWindow) broadcastStatus(mainWindow, true);
+      return;
+    }
+    const current = loadConfig();
+    const cert = getCertBundle(current.certPath || undefined, current.keyPath || undefined);
+    hiveServer = new HiveServer(db, current.port, cert);
+    hiveServer.setMotd(current.motd ?? '');
+    hiveServer.setRegistrationOpen(current.registrationOpen ?? true);
     registerHandlers(hiveServer, db);
     await hiveServer.start();
     updateServer(hiveServer);
@@ -75,6 +83,8 @@ app.whenReady().then(async () => {
   try {
     const cert = getCertBundle(config.certPath || undefined, config.keyPath || undefined);
     hiveServer = new HiveServer(db, config.port, cert);
+    hiveServer.setMotd(config.motd ?? '');
+    hiveServer.setRegistrationOpen(config.registrationOpen ?? true);
     registerHandlers(hiveServer, db);
     await hiveServer.start();
     updateServer(hiveServer);

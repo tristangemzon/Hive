@@ -13,11 +13,13 @@
  *   [remaining bytes: encrypted media payload]
  */
 import * as https from 'node:https';
+import * as http from 'node:http';
 import { EventEmitter } from 'node:events';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { CertBundle } from '../cert.js';
 import { generateNonce, verifyAuthSignature, ensureSodium } from './auth.js';
 import type { Db } from '../db/open.js';
+import * as repos from '../db/repos.js';
 import type { ClientMessage, ServerMessage } from '@shared/types.js';
 
 // How long (ms) a connection has to complete auth before being dropped.
@@ -45,6 +47,11 @@ export class HiveServer extends EventEmitter {
   private port: number;
   private cert: CertBundle;
 
+  /** Message of the day — sent as SrvAnnounce immediately after a client auths. */
+  motd = '';
+  /** When false, POST /api/register is rejected with 403. */
+  registrationOpen = true;
+
   constructor(db: Db, port: number, cert: CertBundle) {
     super();
     this.db = db;
@@ -59,6 +66,9 @@ export class HiveServer extends EventEmitter {
       cert: this.cert.certPem,
       key: this.cert.keyPem,
     });
+
+    // Handle REST API requests before WebSocket upgrades.
+    this.httpsServer.on('request', (req, res) => this.handleHttpRequest(req, res));
 
     this.wss = new WebSocketServer({ server: this.httpsServer });
 
@@ -125,6 +135,25 @@ export class HiveServer extends EventEmitter {
       }
     }
   }
+
+  /** Disconnect a specific peer. Returns true if the peer was connected. */
+  kickPeer(peerId: string): boolean {
+    const ws = this.peers.get(peerId);
+    if (!ws) return false;
+    ws.close(4009, 'kicked');
+    return true;
+  }
+
+  /** Send an announce message to every currently connected peer. */
+  broadcastAnnouncement(text: string): void {
+    const msg = JSON.stringify({ type: 'announce', text, ts: Date.now() } satisfies ServerMessage);
+    for (const ws of this.peers.values()) {
+      if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+    }
+  }
+
+  setMotd(motd: string): void { this.motd = motd; }
+  setRegistrationOpen(open: boolean): void { this.registrationOpen = open; }
 
   // ── Connection lifecycle ───────────────────────────────────────────────────
 
@@ -200,7 +229,29 @@ export class HiveServer extends EventEmitter {
       return;
     }
 
-    // Upsert user in DB (deferred to handler layer which imports repos).
+    // Ensure the peer has a registered account. Unregistered peers must call
+    // POST /api/register via the HTTP API before they can connect over WS.
+    if (!repos.isUserRegistered(this.db, peerId)) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        code: 'not_registered',
+        message: 'Account not found on this server. Please register first.',
+      } satisfies ServerMessage));
+      ws.close(4011, 'not-registered');
+      return;
+    }
+
+    // Reject banned users.
+    if (repos.isBanned(this.db, peerId)) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        code: 'banned',
+        message: 'Your account has been banned from this server.',
+      } satisfies ServerMessage));
+      ws.close(4010, 'banned');
+      return;
+    }
+
     this.sockets.set(ws, { phase: 'authed', peerId });
     this.peers.set(peerId, ws);
 
@@ -225,5 +276,105 @@ export class HiveServer extends EventEmitter {
       this.emit('disconnected', state.peerId);
     }
     this.sockets.delete(ws);
+  }
+
+  // ── HTTP REST API ──────────────────────────────────────────────────────────
+
+  private handleHttpRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+    const url = req.url ?? '/';
+    const method = (req.method ?? 'GET').toUpperCase();
+
+    // CORS headers — allow cross-origin fetches from the Buzz app.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Content-Type', 'application/json');
+
+    if (method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    // GET /api/server-info
+    if (method === 'GET' && url === '/api/server-info') {
+      res.writeHead(200);
+      res.end(JSON.stringify({ serverName: 'Hive', version: '1', registrationOpen: this.registrationOpen }));
+      return;
+    }
+
+    // GET /api/users — list all registered accounts
+    if (method === 'GET' && url === '/api/users') {
+      res.writeHead(200);
+      res.end(JSON.stringify(repos.listRegisteredUsers(this.db)));
+      return;
+    }
+
+    // GET /api/users/:screenName/keystore — download encrypted keystore
+    const keystoreMatch = url.match(/^\/api\/users\/([^/]+)\/keystore$/);
+    if (method === 'GET' && keystoreMatch) {
+      const screenName = decodeURIComponent(keystoreMatch[1]!);
+      const blob = repos.getEncryptedKeystore(this.db, screenName);
+      if (!blob) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'not_found', message: 'User not found.' }));
+        return;
+      }
+      res.writeHead(200);
+      res.end(JSON.stringify({ encryptedKeystoreB64: blob }));
+      return;
+    }
+
+    // POST /api/register — create a new account
+    if (method === 'POST' && url === '/api/register') {
+      if (!this.registrationOpen) {
+        res.writeHead(403);
+        res.end(JSON.stringify({ error: 'registration_closed', message: 'Registration is closed on this server.' }));
+        return;
+      }
+      let body = '';
+      req.on('data', (chunk) => { body += (chunk as Buffer).toString('utf8'); });
+      req.on('end', () => {
+        try {
+          const { screenName, peerId, pubKeyB64, encryptedKeystoreB64 } =
+            JSON.parse(body) as Record<string, string>;
+
+          if (!screenName || !peerId || !pubKeyB64 || !encryptedKeystoreB64) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'missing_fields', message: 'screenName, peerId, pubKeyB64, and encryptedKeystoreB64 are required.' }));
+            return;
+          }
+          if (screenName.length > 64) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'invalid_screen_name', message: 'Screen name must be 64 characters or fewer.' }));
+            return;
+          }
+          if (repos.isScreenNameTaken(this.db, screenName)) {
+            res.writeHead(409);
+            res.end(JSON.stringify({ error: 'screen_name_taken', message: 'That screen name is already taken.' }));
+            return;
+          }
+          repos.registerUser(this.db, peerId, screenName, pubKeyB64, encryptedKeystoreB64);
+          res.writeHead(201);
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          console.error('[hive] POST /api/register error', err);
+          // Duplicate peer_id (same device re-registering) surfaces as UNIQUE constraint.
+          const msg = err instanceof Error ? err.message : '';
+          if (msg.includes('UNIQUE')) {
+            res.writeHead(409);
+            res.end(JSON.stringify({ error: 'already_registered', message: 'This identity is already registered.' }));
+          } else {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'internal', message: 'Internal server error.' }));
+          }
+        }
+      });
+      return;
+    }
+
+    // 404 for everything else.
+    res.writeHead(404);
+    res.end(JSON.stringify({ error: 'not_found' }));
   }
 }

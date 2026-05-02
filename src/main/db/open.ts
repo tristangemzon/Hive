@@ -25,8 +25,24 @@ function migrate(db: Db): void {
   const row = db.prepare('SELECT version FROM schema_version').get() as { version: number } | undefined;
   const current = row?.version ?? 0;
 
-  if (current < CURRENT_VERSION) {
-    // Future migrations go here as: if (current < N) { ... db.pragma or ALTER TABLE; }
-    db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (?)').run(CURRENT_VERSION);
+  if (current < 2) {
+    // Add encrypted_keystore and registered_at columns to users if they don't exist yet.
+    // ALTER TABLE ADD COLUMN is a no-op if the column already exists in SQLite >= 3.37
+    // but older versions throw, so we check first.
+    const cols = (db.prepare(`PRAGMA table_info(users)`).all() as Array<{ name: string }>)
+      .map((c) => c.name);
+    if (!cols.includes('encrypted_keystore')) {
+      db.exec('ALTER TABLE users ADD COLUMN encrypted_keystore TEXT');
+    }
+    if (!cols.includes('registered_at')) {
+      db.exec('ALTER TABLE users ADD COLUMN registered_at INTEGER');
+    }
+    db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (2)').run();
+  }
+
+  if (current < 3) {
+    // banned_users table is created by SCHEMA_SQL (CREATE TABLE IF NOT EXISTS).
+    // No DDL needed here — just stamp the version.
+    db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (3)').run();
   }
 }

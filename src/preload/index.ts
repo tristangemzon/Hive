@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { HiveConfig, HiveStats, HiveUser, HiveRoom } from '@shared/types.js';
+import type { HiveConfig, HiveStats, HiveUser, HiveRoom, HiveBannedUser } from '@shared/types.js';
 import * as IPC from '@shared/ipc.js';
 
 contextBridge.exposeInMainWorld('hiveApi', {
@@ -15,4 +15,11 @@ contextBridge.exposeInMainWorld('hiveApi', {
     ipcRenderer.on(IPC.EvtHiveStatus, listener);
     return () => ipcRenderer.removeListener(IPC.EvtHiveStatus, listener);
   },
+  // Admin actions
+  kickUser:   (peerId: string): Promise<void>            => ipcRenderer.invoke(IPC.HiveKickUser, peerId),
+  banUser:    (peerId: string, reason?: string): Promise<void> => ipcRenderer.invoke(IPC.HiveBanUser, peerId, reason ?? ''),
+  unbanUser:  (peerId: string): Promise<void>            => ipcRenderer.invoke(IPC.HiveUnbanUser, peerId),
+  deleteUser: (peerId: string): Promise<void>            => ipcRenderer.invoke(IPC.HiveDeleteUser, peerId),
+  announce:   (text: string): Promise<void>              => ipcRenderer.invoke(IPC.HiveAnnounce, text),
+  getBanned:  (): Promise<HiveBannedUser[]>              => ipcRenderer.invoke(IPC.HiveGetBanned),
 });

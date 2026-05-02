@@ -10,15 +10,25 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 
 -- Registered users. Pubkey is their ed25519 public key (base64).
+-- encrypted_keystore: the client's keystore.bin blob stored as base64.
+--   Only the user can decrypt it (passphrase-encrypted); server can't read it.
+-- registered_at: set on account creation via POST /api/register.
+--   NULL means the row was created by legacy upsertUser before registration
+--   was enforced; those rows cannot authenticate via WebSocket.
 CREATE TABLE IF NOT EXISTS users (
-  peer_id       TEXT PRIMARY KEY,
-  screen_name   TEXT NOT NULL,
-  pub_key_b64   TEXT NOT NULL,
-  status        TEXT NOT NULL DEFAULT 'offline',
-  away_message  TEXT,
-  last_seen     INTEGER NOT NULL DEFAULT 0,
-  created_at    INTEGER NOT NULL
+  peer_id              TEXT PRIMARY KEY,
+  screen_name          TEXT NOT NULL,
+  pub_key_b64          TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'offline',
+  away_message         TEXT,
+  last_seen            INTEGER NOT NULL DEFAULT 0,
+  created_at           INTEGER NOT NULL,
+  encrypted_keystore   TEXT,
+  registered_at        INTEGER
 );
+
+-- Unique index on screen_name (case-sensitive) so no two accounts share a name.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_screen_name ON users(screen_name);
 
 -- Buddy relationships. Symmetric: (a→b) + (b→a) both present when approved.
 CREATE TABLE IF NOT EXISTS buddy_relationships (
@@ -94,6 +104,13 @@ CREATE TABLE IF NOT EXISTS room_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_room_messages_channel ON room_messages(room_id, channel_id, ts DESC);
+
+-- Banned users. Banned peers are rejected at WebSocket auth time.
+CREATE TABLE IF NOT EXISTS banned_users (
+  peer_id    TEXT PRIMARY KEY,
+  banned_at  INTEGER NOT NULL,
+  reason     TEXT
+);
 `;
 
-export const CURRENT_VERSION = 1;
+export const CURRENT_VERSION = 3;

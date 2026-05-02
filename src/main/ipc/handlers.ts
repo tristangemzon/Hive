@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import type { Db } from '../db/open.js';
 import type { HiveServer } from '../server/ws.js';
-import type { HiveConfig, HiveStats, HiveUser, HiveRoom } from '@shared/types.js';
+import type { HiveConfig, HiveStats, HiveUser, HiveRoom, HiveBannedUser } from '@shared/types.js';
 import * as IPC from '@shared/ipc.js';
 import * as repos from '../db/repos.js';
 
@@ -23,6 +23,8 @@ export function registerIpcHandlers(
     const totalUsers = (db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number }).n;
     const totalRooms = (db.prepare('SELECT COUNT(*) as n FROM rooms').get() as { n: number }).n;
     const totalMessages = repos.countMessages(db);
+    const undeliveredMessages = repos.countUndeliveredAll(db);
+    const bannedUsers = repos.countBanned(db);
     return {
       running: _srv !== null,
       port: _cfg.port,
@@ -31,14 +33,18 @@ export function registerIpcHandlers(
       totalUsers,
       totalRooms,
       totalMessages,
+      undeliveredMessages,
+      bannedUsers,
     };
   });
 
   ipcMain.handle(IPC.HiveGetUsers, (): HiveUser[] => {
     const connectedIds = new Set(_srv ? _srv.connectedPeerIds : []);
+    const bannedIds = new Set(repos.listBannedUsers(db).map((b) => b.peerId));
     return repos.listUsers(db).map((u) => ({
       ...u,
       connected: connectedIds.has(u.peerId),
+      banned: bannedIds.has(u.peerId),
     }));
   });
 
@@ -50,7 +56,34 @@ export function registerIpcHandlers(
 
   ipcMain.handle(IPC.HiveSetConfig, (_event, cfg: HiveConfig) => {
     _cfg = cfg;
-    // Persisting to disk is handled by the caller (main index.ts).
+  });
+
+  // ── Admin actions ──────────────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.HiveKickUser, (_event, peerId: string) => {
+    _srv?.kickPeer(peerId);
+  });
+
+  ipcMain.handle(IPC.HiveBanUser, (_event, peerId: string, reason = '') => {
+    repos.banUser(db, peerId, reason);
+    _srv?.kickPeer(peerId); // disconnect immediately if online
+  });
+
+  ipcMain.handle(IPC.HiveUnbanUser, (_event, peerId: string) => {
+    repos.unbanUser(db, peerId);
+  });
+
+  ipcMain.handle(IPC.HiveDeleteUser, (_event, peerId: string) => {
+    _srv?.kickPeer(peerId); // disconnect first if online
+    repos.deleteUser(db, peerId);
+  });
+
+  ipcMain.handle(IPC.HiveAnnounce, (_event, text: string) => {
+    _srv?.broadcastAnnouncement(text);
+  });
+
+  ipcMain.handle(IPC.HiveGetBanned, (): HiveBannedUser[] => {
+    return repos.listBannedUsers(db);
   });
 }
 

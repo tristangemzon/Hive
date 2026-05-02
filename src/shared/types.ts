@@ -59,6 +59,8 @@ export type SrvTalkSignal = { type: 'talkSignal'; from: string; callId: string; 
 export type SrvGameSignal = { type: 'gameSignal'; from: string; action: string; kind: string; path?: number[] };
 export type SrvRoomMemberJoin = { type: 'roomMemberJoin'; roomId: string; peerId: string; screenName: string };
 export type SrvRoomMemberLeave = { type: 'roomMemberLeave'; roomId: string; peerId: string };
+// Server-originated announcement (MOTD on connect, or admin broadcast).
+export type SrvAnnounce = { type: 'announce'; text: string; ts: number };
 
 export type ServerMessage =
   | SrvChallenge
@@ -77,7 +79,8 @@ export type ServerMessage =
   | SrvTalkSignal
   | SrvGameSignal
   | SrvRoomMemberJoin
-  | SrvRoomMemberLeave;
+  | SrvRoomMemberLeave
+  | SrvAnnounce;
 
 // ── Client → Server messages ────────────────────────────────────────────────
 
@@ -180,6 +183,8 @@ export type HiveConfig = {
   port: number;
   certPath: string;   // empty = auto-generated self-signed
   keyPath: string;
+  motd?: string;             // message of the day sent to clients on connect
+  registrationOpen?: boolean; // false = reject new registrations
 };
 
 export type HiveStats = {
@@ -190,6 +195,8 @@ export type HiveStats = {
   totalUsers: number;
   totalRooms: number;
   totalMessages: number;
+  undeliveredMessages: number;
+  bannedUsers: number;
 };
 
 export type HiveUser = {
@@ -198,6 +205,14 @@ export type HiveUser = {
   status: UserStatus;
   connected: boolean;
   lastSeen: number;
+  banned: boolean;
+};
+
+export type HiveBannedUser = {
+  peerId: string;
+  screenName: string;
+  bannedAt: number;
+  reason: string;
 };
 
 export type HiveRoom = {
