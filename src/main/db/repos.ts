@@ -349,3 +349,46 @@ export function deleteUser(db: Db, peerId: string): void {
 export function countBanned(db: Db): number {
   return (db.prepare('SELECT COUNT(*) as n FROM banned_users').get() as { n: number }).n;
 }
+
+// ── Reactions ─────────────────────────────────────────────────────────────────
+
+export function upsertReaction(
+  db: Db,
+  msgId: string,
+  fromPeerId: string,
+  toPeerId: string,
+  emoji: string,
+  ts: number,
+  removed: boolean,
+  delivered: boolean,
+): void {
+  db.prepare(`
+    INSERT INTO reactions (msg_id, from_peer_id, to_peer_id, emoji, ts, removed, delivered)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(msg_id, from_peer_id, emoji) DO UPDATE SET
+      removed   = excluded.removed,
+      ts        = excluded.ts,
+      delivered = excluded.delivered
+  `).run(msgId, fromPeerId, toPeerId, emoji, ts, removed ? 1 : 0, delivered ? 1 : 0);
+}
+
+export function markReactionDelivered(db: Db, msgId: string, fromPeerId: string, emoji: string): void {
+  db.prepare('UPDATE reactions SET delivered = 1 WHERE msg_id = ? AND from_peer_id = ? AND emoji = ?')
+    .run(msgId, fromPeerId, emoji);
+}
+
+export function listUndeliveredReactions(
+  db: Db,
+  toPeerId: string,
+): Array<{ msgId: string; from: string; emoji: string; ts: number; removed: boolean }> {
+  const rows = db.prepare(
+    'SELECT msg_id, from_peer_id, emoji, ts, removed FROM reactions WHERE to_peer_id = ? AND delivered = 0 ORDER BY ts ASC',
+  ).all(toPeerId) as Array<{ msg_id: string; from_peer_id: string; emoji: string; ts: number; removed: number }>;
+  return rows.map((r) => ({
+    msgId: r.msg_id,
+    from: r.from_peer_id,
+    emoji: r.emoji,
+    ts: r.ts,
+    removed: r.removed === 1,
+  }));
+}

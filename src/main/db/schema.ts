@@ -111,6 +111,22 @@ CREATE TABLE IF NOT EXISTS banned_users (
   banned_at  INTEGER NOT NULL,
   reason     TEXT
 );
+
+-- 1:1 reaction history. Stored for offline delivery.
+-- removed = 1 means the reaction was taken back.
+-- delivered = 1 once relayed to the target peer.
+CREATE TABLE IF NOT EXISTS reactions (
+  msg_id       TEXT NOT NULL,
+  from_peer_id TEXT NOT NULL,
+  to_peer_id   TEXT NOT NULL,
+  emoji        TEXT NOT NULL,
+  ts           INTEGER NOT NULL,
+  removed      INTEGER NOT NULL DEFAULT 0,
+  delivered    INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (msg_id, from_peer_id, emoji)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reactions_to ON reactions(to_peer_id, delivered, removed);
 `;
 
-export const CURRENT_VERSION = 3;
+export const CURRENT_VERSION = 4;

@@ -45,4 +45,10 @@ function migrate(db: Db): void {
     // No DDL needed here — just stamp the version.
     db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (3)').run();
   }
+
+  if (current < 4) {
+    // reactions table is created by SCHEMA_SQL (CREATE TABLE IF NOT EXISTS).
+    // No DDL needed here — just stamp the version.
+    db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (4)').run();
+  }
 }

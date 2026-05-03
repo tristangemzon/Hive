@@ -61,6 +61,15 @@ export type SrvRoomMemberJoin = { type: 'roomMemberJoin'; roomId: string; peerId
 export type SrvRoomMemberLeave = { type: 'roomMemberLeave'; roomId: string; peerId: string };
 // Server-originated announcement (MOTD on connect, or admin broadcast).
 export type SrvAnnounce = { type: 'announce'; text: string; ts: number };
+// 1:1 reaction relay. added=true → emoji added; added=false → emoji removed.
+// Stored for offline delivery (same as SrvIm).
+export type SrvReaction = { type: 'reaction'; from: string; msgId: string; emoji: string; added: boolean };
+// Room reaction relay — relay-only, not stored.
+export type SrvRoomReaction = { type: 'roomReaction'; roomId: string; from: string; msgId: string; emoji: string; added: boolean };
+// Ephemeral typing indicator — relayed only if recipient is online.
+export type SrvTyping = { type: 'typing'; from: string; typing: boolean };
+// Read receipt — relayed only if recipient is online.
+export type SrvReadReceipt = { type: 'readReceipt'; from: string; msgId: string };
 
 export type ServerMessage =
   | SrvChallenge
@@ -80,7 +89,11 @@ export type ServerMessage =
   | SrvGameSignal
   | SrvRoomMemberJoin
   | SrvRoomMemberLeave
-  | SrvAnnounce;
+  | SrvAnnounce
+  | SrvReaction
+  | SrvRoomReaction
+  | SrvTyping
+  | SrvReadReceipt;
 
 // ── Client → Server messages ────────────────────────────────────────────────
 
@@ -127,6 +140,16 @@ export type CliRoomChannelAdd = { type: 'roomChannelAdd'; roomId: string; channe
 export type CliTalkSignal = { type: 'talkSignal'; to: string; callId: string; signal: string; payload: unknown };
 // Game signalling — relayed as-is to target peer
 export type CliGameSignal = { type: 'gameSignal'; to: string; action: string; kind: string; path?: number[] };
+// 1:1 reactions — stored for offline delivery
+export type CliReaction = { type: 'reaction'; to: string; msgId: string; emoji: string };
+export type CliUnreaction = { type: 'unreaction'; to: string; msgId: string; emoji: string };
+// Room reactions — relayed to online members only (not stored)
+export type CliRoomReaction = { type: 'roomReaction'; roomId: string; msgId: string; emoji: string };
+export type CliRoomUnreaction = { type: 'roomUnreaction'; roomId: string; msgId: string; emoji: string };
+// Ephemeral typing indicator — relay-only
+export type CliTyping = { type: 'typing'; to: string; typing: boolean };
+// Read receipt — relay-only
+export type CliReadReceipt = { type: 'readReceipt'; to: string; msgId: string };
 
 export type ClientMessage =
   | CliAuth
@@ -144,7 +167,13 @@ export type ClientMessage =
   | CliGetRoomHistory
   | CliRoomChannelAdd
   | CliTalkSignal
-  | CliGameSignal;
+  | CliGameSignal
+  | CliReaction
+  | CliUnreaction
+  | CliRoomReaction
+  | CliRoomUnreaction
+  | CliTyping
+  | CliReadReceipt;
 
 // ── Shared entity types ──────────────────────────────────────────────────────
 

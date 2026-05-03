@@ -33,22 +33,28 @@ export function registerHandlers(srv: HiveServer, db: Db): void {
 
 function dispatch(srv: HiveServer, db: Db, peerId: string, msg: ClientMessage): void {
   switch (msg.type) {
-    case 'auth':            return handleAuth(srv, db, peerId, msg);
-    case 'setStatus':       return handleSetStatus(srv, db, peerId, msg);
-    case 'im':              return handleIm(srv, db, peerId, msg);
-    case 'ack':             return handleAck(srv, db, peerId, msg);
-    case 'buddyAdd':        return handleBuddyAdd(srv, db, peerId, msg);
-    case 'buddyRemove':     return handleBuddyRemove(srv, db, peerId, msg);
-    case 'buddyApprove':    return handleBuddyApprove(srv, db, peerId, msg);
-    case 'buddyDeny':       return handleBuddyDeny(srv, db, peerId, msg);
-    case 'roomCreate':      return handleRoomCreate(srv, db, peerId, msg);
-    case 'roomInvite':      return handleRoomInvite(srv, db, peerId, msg);
-    case 'roomMsg':         return handleRoomMsg(srv, db, peerId, msg);
-    case 'roomChannelAdd':  return handleRoomChannelAdd(srv, db, peerId, msg);
-    case 'getHistory':      return handleGetHistory(srv, db, peerId, msg);
-    case 'getRoomHistory':  return handleGetRoomHistory(srv, db, peerId, msg);
-    case 'talkSignal':      return handleTalkSignal(srv, peerId, msg);
-    case 'gameSignal':      return handleGameSignal(srv, peerId, msg);
+    case 'auth':             return handleAuth(srv, db, peerId, msg);
+    case 'setStatus':        return handleSetStatus(srv, db, peerId, msg);
+    case 'im':               return handleIm(srv, db, peerId, msg);
+    case 'ack':              return handleAck(srv, db, peerId, msg);
+    case 'buddyAdd':         return handleBuddyAdd(srv, db, peerId, msg);
+    case 'buddyRemove':      return handleBuddyRemove(srv, db, peerId, msg);
+    case 'buddyApprove':     return handleBuddyApprove(srv, db, peerId, msg);
+    case 'buddyDeny':        return handleBuddyDeny(srv, db, peerId, msg);
+    case 'roomCreate':       return handleRoomCreate(srv, db, peerId, msg);
+    case 'roomInvite':       return handleRoomInvite(srv, db, peerId, msg);
+    case 'roomMsg':          return handleRoomMsg(srv, db, peerId, msg);
+    case 'roomChannelAdd':   return handleRoomChannelAdd(srv, db, peerId, msg);
+    case 'getHistory':       return handleGetHistory(srv, db, peerId, msg);
+    case 'getRoomHistory':   return handleGetRoomHistory(srv, db, peerId, msg);
+    case 'talkSignal':       return handleTalkSignal(srv, peerId, msg);
+    case 'gameSignal':       return handleGameSignal(srv, peerId, msg);
+    case 'reaction':         return handleReaction(srv, db, peerId, msg);
+    case 'unreaction':       return handleUnreaction(srv, db, peerId, msg);
+    case 'roomReaction':     return handleRoomReaction(srv, db, peerId, msg);
+    case 'roomUnreaction':   return handleRoomUnreaction(srv, db, peerId, msg);
+    case 'typing':           return handleTyping(srv, peerId, msg);
+    case 'readReceipt':      return handleReadReceipt(srv, peerId, msg);
     default:
       // Exhaustiveness guard — unknown message type, ignore silently.
       break;
@@ -101,6 +107,19 @@ function handleAuth(
       ts: m.ts,
       cipherB64: m.cipherB64,
     });
+  }
+
+  // Deliver unread reactions.
+  const undeliveredReactions = repos.listUndeliveredReactions(db, peerId);
+  for (const r of undeliveredReactions) {
+    srv.send(peerId, {
+      type: 'reaction',
+      from: r.from,
+      msgId: r.msgId,
+      emoji: r.emoji,
+      added: !r.removed,
+    });
+    repos.markReactionDelivered(db, r.msgId, r.from, r.emoji);
   }
 
   // Notify buddies that this peer came online.
@@ -431,6 +450,96 @@ function handleGameSignal(
     kind: msg.kind,
     ...(msg.path ? { path: msg.path } : {}),
   });
+}
+
+// ── Reactions ─────────────────────────────────────────────────────────────────
+
+function handleReaction(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliReaction,
+): void {
+  const isOnline = srv.connectedPeerIds.includes(msg.to);
+  repos.upsertReaction(db, msg.msgId, peerId, msg.to, msg.emoji, Date.now(), false, isOnline);
+  if (isOnline) {
+    srv.send(msg.to, { type: 'reaction', from: peerId, msgId: msg.msgId, emoji: msg.emoji, added: true });
+  }
+}
+
+function handleUnreaction(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliUnreaction,
+): void {
+  const isOnline = srv.connectedPeerIds.includes(msg.to);
+  repos.upsertReaction(db, msg.msgId, peerId, msg.to, msg.emoji, Date.now(), true, isOnline);
+  if (isOnline) {
+    srv.send(msg.to, { type: 'reaction', from: peerId, msgId: msg.msgId, emoji: msg.emoji, added: false });
+  }
+}
+
+function handleRoomReaction(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliRoomReaction,
+): void {
+  if (!repos.isRoomMember(db, msg.roomId, peerId)) return;
+  const memberIds = repos.listRoomMembers(db, msg.roomId).map((m) => m.peerId);
+  srv.broadcastToMany(memberIds, {
+    type: 'roomReaction',
+    roomId: msg.roomId,
+    from: peerId,
+    msgId: msg.msgId,
+    emoji: msg.emoji,
+    added: true,
+  });
+}
+
+function handleRoomUnreaction(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliRoomUnreaction,
+): void {
+  if (!repos.isRoomMember(db, msg.roomId, peerId)) return;
+  const memberIds = repos.listRoomMembers(db, msg.roomId).map((m) => m.peerId);
+  srv.broadcastToMany(memberIds, {
+    type: 'roomReaction',
+    roomId: msg.roomId,
+    from: peerId,
+    msgId: msg.msgId,
+    emoji: msg.emoji,
+    added: false,
+  });
+}
+
+// ── Typing indicator ──────────────────────────────────────────────────────────
+
+function handleTyping(
+  srv: HiveServer,
+  peerId: string,
+  msg: import('@shared/types.js').CliTyping,
+): void {
+  // Relay-only; silently drop if recipient is offline.
+  if (srv.connectedPeerIds.includes(msg.to)) {
+    srv.send(msg.to, { type: 'typing', from: peerId, typing: msg.typing });
+  }
+}
+
+// ── Read receipts ─────────────────────────────────────────────────────────────
+
+function handleReadReceipt(
+  srv: HiveServer,
+  peerId: string,
+  msg: import('@shared/types.js').CliReadReceipt,
+): void {
+  // Relay-only; silently drop if recipient is offline.
+  if (srv.connectedPeerIds.includes(msg.to)) {
+    srv.send(msg.to, { type: 'readReceipt', from: peerId, msgId: msg.msgId });
+  }
 }
 
 /**
