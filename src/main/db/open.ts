@@ -51,4 +51,14 @@ function migrate(db: Db): void {
     // No DDL needed here — just stamp the version.
     db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (4)').run();
   }
+
+  if (current < 5) {
+    // Add category column to room_channels for channel grouping (v0.6.0).
+    const cols = (db.prepare(`PRAGMA table_info(room_channels)`).all() as Array<{ name: string }>)
+      .map((c) => c.name);
+    if (!cols.includes('category')) {
+      db.exec("ALTER TABLE room_channels ADD COLUMN category TEXT NOT NULL DEFAULT ''");
+    }
+    db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (5)').run();
+  }
 }

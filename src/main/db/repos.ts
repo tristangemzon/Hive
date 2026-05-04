@@ -222,8 +222,8 @@ export function createRoom(db: Db, id: string, name: string, createdBy: string):
     .run(id, name, createdBy, Date.now());
 }
 
-export function getRoom(db: Db, id: string): { id: string; name: string } | null {
-  const row = db.prepare('SELECT id, name FROM rooms WHERE id = ?').get(id) as { id: string; name: string } | undefined;
+export function getRoom(db: Db, id: string): { id: string; name: string; createdBy: string } | null {
+  const row = db.prepare('SELECT id, name, created_by as createdBy FROM rooms WHERE id = ?').get(id) as { id: string; name: string; createdBy: string } | undefined;
   return row ?? null;
 }
 
@@ -246,14 +246,18 @@ export function getRoomKeyEnvelope(db: Db, roomId: string, peerId: string): stri
   return row?.key_envelope_b64 ?? null;
 }
 
-export function addRoomChannel(db: Db, id: string, roomId: string, name: string, kind: 'text' | 'voice'): void {
-  db.prepare('INSERT OR IGNORE INTO room_channels (id, room_id, name, kind, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(id, roomId, name, kind, Date.now());
+export function addRoomChannel(db: Db, id: string, roomId: string, name: string, kind: 'text' | 'voice', category = ''): void {
+  db.prepare('INSERT OR IGNORE INTO room_channels (id, room_id, name, kind, category, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, roomId, name, kind, category, Date.now());
 }
 
 export function listRoomChannels(db: Db, roomId: string): ChannelEntry[] {
-  const rows = db.prepare('SELECT id, name, kind FROM room_channels WHERE room_id = ? ORDER BY created_at ASC').all(roomId) as Array<{ id: string; name: string; kind: string }>;
-  return rows.map((r) => ({ id: r.id, name: r.name, kind: r.kind as 'text' | 'voice' }));
+  const rows = db.prepare('SELECT id, name, kind, category FROM room_channels WHERE room_id = ? ORDER BY created_at ASC').all(roomId) as Array<{ id: string; name: string; kind: string; category: string }>;
+  return rows.map((r) => ({ id: r.id, name: r.name, kind: r.kind as 'text' | 'voice', category: r.category || undefined }));
+}
+
+export function setChannelCategory(db: Db, channelId: string, category: string): void {
+  db.prepare('UPDATE room_channels SET category = ? WHERE id = ?').run(category, channelId);
 }
 
 export function listRoomEntriesForPeer(db: Db, peerId: string): RoomEntry[] {

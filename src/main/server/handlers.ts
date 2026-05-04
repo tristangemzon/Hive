@@ -45,6 +45,10 @@ function dispatch(srv: HiveServer, db: Db, peerId: string, msg: ClientMessage): 
     case 'roomInvite':       return handleRoomInvite(srv, db, peerId, msg);
     case 'roomMsg':          return handleRoomMsg(srv, db, peerId, msg);
     case 'roomChannelAdd':   return handleRoomChannelAdd(srv, db, peerId, msg);
+    case 'roomPin':          return handleRoomPin(srv, db, peerId, msg);
+    case 'roomKick':         return handleRoomKick(srv, db, peerId, msg);
+    case 'roomRole':         return handleRoomRole(srv, db, peerId, msg);
+    case 'roomCategory':     return handleRoomCategory(srv, db, peerId, msg);
     case 'getHistory':       return handleGetHistory(srv, db, peerId, msg);
     case 'getRoomHistory':   return handleGetRoomHistory(srv, db, peerId, msg);
     case 'talkSignal':       return handleTalkSignal(srv, peerId, msg);
@@ -120,6 +124,21 @@ function handleAuth(
       added: !r.removed,
     });
     repos.markReactionDelivered(db, r.msgId, r.from, r.emoji);
+  }
+
+  // Replay channel categories for all rooms this peer is a member of.
+  const rooms = repos.listRoomEntriesForPeer(db, peerId);
+  for (const room of rooms) {
+    for (const ch of room.channels) {
+      if (ch.category) {
+        srv.send(peerId, {
+          type: 'roomCategory',
+          roomId: room.id,
+          channelId: ch.id,
+          category: ch.category,
+        });
+      }
+    }
   }
 
   // Notify buddies that this peer came online.
@@ -323,6 +342,7 @@ function handleRoomCreate(
       keyEnvelopeB64: env.cipherB64,
       channels,
       members: allMemberIds,
+      ownerPeerId: peerId, // v0.6.0: creator is the owner
     });
   }
 }
@@ -351,6 +371,7 @@ function handleRoomInvite(
       keyEnvelopeB64: msg.keyEnvelopeB64,
       channels,
       members: allMemberIds,
+      ownerPeerId: room.createdBy, // v0.6.0: pass through the original owner
     });
   }
 
@@ -386,6 +407,10 @@ function handleRoomMsg(
     msgId: msg.msgId,
     ts: msg.ts,
     cipherB64: msg.cipherB64,
+    // v0.6.0: relay metadata alongside the encrypted body
+    ...(msg.fromName !== undefined && { fromName: msg.fromName }),
+    ...(msg.replyToId !== undefined && { replyToId: msg.replyToId }),
+    ...(msg.mentions !== undefined && { mentions: msg.mentions }),
   });
 }
 
@@ -397,6 +422,15 @@ function handleRoomChannelAdd(
 ): void {
   if (!repos.isRoomMember(db, msg.roomId, peerId)) return;
   repos.addRoomChannel(db, msg.channelId, msg.roomId, msg.name, msg.kind);
+  // Broadcast to all room members so they see the new channel immediately.
+  const memberIds = repos.listRoomMembers(db, msg.roomId).map((m) => m.peerId);
+  srv.broadcastToMany(memberIds, {
+    type: 'roomChannelAdd',
+    roomId: msg.roomId,
+    channelId: msg.channelId,
+    name: msg.name,
+    kind: msg.kind,
+  });
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
@@ -541,6 +575,82 @@ function handleReadReceipt(
     srv.send(msg.to, { type: 'readReceipt', from: peerId, msgId: msg.msgId });
   }
 }
+
+// ── v0.6.0 Room moderation ────────────────────────────────────────────────────
+
+function handleRoomPin(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliRoomPin,
+): void {
+  if (!repos.isRoomMember(db, msg.roomId, peerId)) return;
+  const memberIds = repos.listRoomMembers(db, msg.roomId).map((m) => m.peerId);
+  srv.broadcastToMany(memberIds, {
+    type: 'roomPin',
+    roomId: msg.roomId,
+    from: peerId,
+    msgId: msg.msgId,
+    isPinned: msg.isPinned,
+  });
+}
+
+function handleRoomKick(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliRoomKick,
+): void {
+  if (!repos.isRoomMember(db, msg.roomId, peerId)) return;
+  // Relay kick to all current members (including the kicked peer if online).
+  const memberIds = repos.listRoomMembers(db, msg.roomId).map((m) => m.peerId);
+  srv.broadcastToMany(memberIds, {
+    type: 'roomKick',
+    roomId: msg.roomId,
+    from: peerId,
+    peerId: msg.peerId,
+  });
+  // Remove the kicked member so they can no longer receive room messages.
+  db.prepare('DELETE FROM room_members WHERE room_id = ? AND peer_id = ?')
+    .run(msg.roomId, msg.peerId);
+}
+
+function handleRoomRole(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliRoomRole,
+): void {
+  if (!repos.isRoomMember(db, msg.roomId, peerId)) return;
+  const memberIds = repos.listRoomMembers(db, msg.roomId).map((m) => m.peerId);
+  srv.broadcastToMany(memberIds, {
+    type: 'roomRole',
+    roomId: msg.roomId,
+    from: peerId,
+    peerId: msg.peerId,
+    role: msg.role,
+  });
+}
+
+function handleRoomCategory(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliRoomCategory,
+): void {
+  if (!repos.isRoomMember(db, msg.roomId, peerId)) return;
+  // Persist so new/reconnecting members get the current category on auth.
+  repos.setChannelCategory(db, msg.channelId, msg.category);
+  const memberIds = repos.listRoomMembers(db, msg.roomId).map((m) => m.peerId);
+  srv.broadcastToMany(memberIds, {
+    type: 'roomCategory',
+    roomId: msg.roomId,
+    channelId: msg.channelId,
+    category: msg.category,
+  });
+}
+
+
 
 /**
  * Binary voice/video relay.

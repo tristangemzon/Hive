@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS room_channels (
   room_id    TEXT NOT NULL,
   name       TEXT NOT NULL,
   kind       TEXT NOT NULL DEFAULT 'text' CHECK (kind IN ('text','voice')),
+  category   TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL
 );
 
@@ -129,4 +130,4 @@ CREATE TABLE IF NOT EXISTS reactions (
 CREATE INDEX IF NOT EXISTS idx_reactions_to ON reactions(to_peer_id, delivered, removed);
 `;
 
-export const CURRENT_VERSION = 4;
+export const CURRENT_VERSION = 5;

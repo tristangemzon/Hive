@@ -24,6 +24,7 @@ export type SrvRoomInvite = {
   keyEnvelopeB64: string; // room key sealed to recipient's X25519 pubkey
   channels: ChannelEntry[];
   members: string[];
+  ownerPeerId?: string; // v0.6.0: peerId of the room owner for role enforcement
 };
 export type SrvRoomMsg = {
   type: 'roomMsg';
@@ -33,6 +34,10 @@ export type SrvRoomMsg = {
   msgId: string;
   ts: number;
   cipherB64: string;
+  // v0.6.0: metadata relayed alongside the encrypted body
+  fromName?: string;
+  replyToId?: string;
+  mentions?: string[];
 };
 export type SrvHistory = {
   type: 'history';
@@ -70,6 +75,13 @@ export type SrvRoomReaction = { type: 'roomReaction'; roomId: string; from: stri
 export type SrvTyping = { type: 'typing'; from: string; typing: boolean };
 // Read receipt — relayed only if recipient is online.
 export type SrvReadReceipt = { type: 'readReceipt'; from: string; msgId: string };
+// v0.6.0 room moderation — relayed to all online room members.
+export type SrvRoomPin = { type: 'roomPin'; roomId: string; from: string; msgId: string; isPinned: boolean };
+export type SrvRoomKick = { type: 'roomKick'; roomId: string; from: string; peerId: string };
+export type SrvRoomRole = { type: 'roomRole'; roomId: string; from: string; peerId: string; role: string };
+export type SrvRoomCategory = { type: 'roomCategory'; roomId: string; channelId: string; category: string };
+// Room channel add — broadcast to all members when a channel is created.
+export type SrvRoomChannelAdd = { type: 'roomChannelAdd'; roomId: string; channelId: string; name: string; kind: 'text' | 'voice' };
 
 export type ServerMessage =
   | SrvChallenge
@@ -93,7 +105,12 @@ export type ServerMessage =
   | SrvReaction
   | SrvRoomReaction
   | SrvTyping
-  | SrvReadReceipt;
+  | SrvReadReceipt
+  | SrvRoomPin
+  | SrvRoomKick
+  | SrvRoomRole
+  | SrvRoomCategory
+  | SrvRoomChannelAdd;
 
 // ── Client → Server messages ────────────────────────────────────────────────
 
@@ -132,6 +149,10 @@ export type CliRoomMsg = {
   msgId: string;
   ts: number;
   cipherB64: string;
+  // v0.6.0: metadata alongside the encrypted body
+  fromName?: string;
+  replyToId?: string;
+  mentions?: string[];
 };
 export type CliGetHistory = { type: 'getHistory'; peerId: string; before?: number; limit?: number };
 export type CliGetRoomHistory = { type: 'getRoomHistory'; roomId: string; channelId: string; before?: number; limit?: number };
@@ -150,6 +171,11 @@ export type CliRoomUnreaction = { type: 'roomUnreaction'; roomId: string; msgId:
 export type CliTyping = { type: 'typing'; to: string; typing: boolean };
 // Read receipt — relay-only
 export type CliReadReceipt = { type: 'readReceipt'; to: string; msgId: string };
+// v0.6.0 room moderation — relayed to all room members.
+export type CliRoomPin = { type: 'roomPin'; roomId: string; msgId: string; isPinned: boolean };
+export type CliRoomKick = { type: 'roomKick'; roomId: string; peerId: string };
+export type CliRoomRole = { type: 'roomRole'; roomId: string; peerId: string; role: string };
+export type CliRoomCategory = { type: 'roomCategory'; roomId: string; channelId: string; category: string };
 
 export type ClientMessage =
   | CliAuth
@@ -173,7 +199,11 @@ export type ClientMessage =
   | CliRoomReaction
   | CliRoomUnreaction
   | CliTyping
-  | CliReadReceipt;
+  | CliReadReceipt
+  | CliRoomPin
+  | CliRoomKick
+  | CliRoomRole
+  | CliRoomCategory;
 
 // ── Shared entity types ──────────────────────────────────────────────────────
 
@@ -204,6 +234,7 @@ export type ChannelEntry = {
   id: string;
   name: string;
   kind: 'text' | 'voice';
+  category?: string;
 };
 
 // ── IPC types (Hive main ↔ renderer dashboard) ──────────────────────────────
