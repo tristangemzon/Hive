@@ -83,15 +83,20 @@ const set  = (...i: Buffer[]) => tlv(0x31, ...i);
 const ctx0 = (...i: Buffer[]) => tlv(0xa0, ...i);
 
 function derInt(val: Buffer): Buffer {
-  const pad = (val[0] & 0x80) ? Buffer.from([0x00]) : Buffer.alloc(0);
+  if (val.length === 0) throw new Error('DER integer cannot be empty');
+  const pad = (val[0]! & 0x80) ? Buffer.from([0x00]) : Buffer.alloc(0);
   return tlv(0x02, Buffer.concat([pad, val]));
 }
 
 function derOid(dotted: string): Buffer {
   const parts = dotted.split('.').map(Number);
-  const bytes: number[] = [40 * parts[0] + parts[1]];
+  if (parts.length < 2 || parts.some((p) => !Number.isInteger(p) || p < 0)) {
+    throw new Error(`Invalid OID: ${dotted}`);
+  }
+  const [first, second] = parts as [number, number, ...number[]];
+  const bytes: number[] = [40 * first + second];
   for (let i = 2; i < parts.length; i++) {
-    let n = parts[i];
+    let n = parts[i]!;
     const chunk: number[] = [n & 0x7f];
     n >>>= 7;
     while (n > 0) {
@@ -131,7 +136,7 @@ function buildSelfSignedDer(privateKeyPem: string, spkiDer: Buffer): string {
 
   // Serial: 16-byte random positive integer (first byte forced non-zero)
   const serialBytes = randomBytes(16);
-  serialBytes[0] = (serialBytes[0] & 0x7f) | 0x01;
+  serialBytes[0] = (serialBytes[0]! & 0x7f) | 0x01;
 
   const dn = buildDistinguishedName();
 

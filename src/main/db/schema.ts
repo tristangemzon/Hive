@@ -101,6 +101,8 @@ CREATE TABLE IF NOT EXISTS room_messages (
   from_peer  TEXT NOT NULL,
   ts         INTEGER NOT NULL,
   cipher_b64 TEXT NOT NULL,
+  edited_at  INTEGER,
+  deleted_at INTEGER,
   created_at INTEGER NOT NULL
 );
 
@@ -130,4 +132,4 @@ CREATE TABLE IF NOT EXISTS reactions (
 CREATE INDEX IF NOT EXISTS idx_reactions_to ON reactions(to_peer_id, delivered, removed);
 `;
 
-export const CURRENT_VERSION = 5;
+export const CURRENT_VERSION = 6;

@@ -61,4 +61,17 @@ function migrate(db: Db): void {
     }
     db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (5)').run();
   }
+
+  if (current < 6) {
+    // Add v0.7.0 room message action columns for encrypted edits/deletes.
+    const cols = (db.prepare(`PRAGMA table_info(room_messages)`).all() as Array<{ name: string }>)
+      .map((c) => c.name);
+    if (!cols.includes('edited_at')) {
+      db.exec('ALTER TABLE room_messages ADD COLUMN edited_at INTEGER');
+    }
+    if (!cols.includes('deleted_at')) {
+      db.exec('ALTER TABLE room_messages ADD COLUMN deleted_at INTEGER');
+    }
+    db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (6)').run();
+  }
 }

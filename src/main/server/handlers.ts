@@ -57,6 +57,8 @@ function dispatch(srv: HiveServer, db: Db, peerId: string, msg: ClientMessage): 
     case 'unreaction':       return handleUnreaction(srv, db, peerId, msg);
     case 'roomReaction':     return handleRoomReaction(srv, db, peerId, msg);
     case 'roomUnreaction':   return handleRoomUnreaction(srv, db, peerId, msg);
+    case 'roomEditMsg':      return handleRoomEditMsg(srv, db, peerId, msg);
+    case 'roomDeleteMsg':    return handleRoomDeleteMsg(srv, db, peerId, msg);
     case 'typing':           return handleTyping(srv, peerId, msg);
     case 'readReceipt':      return handleReadReceipt(srv, peerId, msg);
     default:
@@ -547,6 +549,43 @@ function handleRoomUnreaction(
     msgId: msg.msgId,
     emoji: msg.emoji,
     added: false,
+  });
+}
+
+function handleRoomEditMsg(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliRoomEditMsg,
+): void {
+  if (!repos.isRoomMember(db, msg.roomId, peerId)) return;
+  repos.editRoomMessage(db, msg.roomId, msg.msgId, msg.cipherB64, msg.ts);
+  const memberIds = repos.listRoomMembers(db, msg.roomId).map((m) => m.peerId);
+  srv.broadcastToMany(memberIds, {
+    type: 'roomEditMsg',
+    roomId: msg.roomId,
+    from: peerId,
+    msgId: msg.msgId,
+    ts: msg.ts,
+    cipherB64: msg.cipherB64,
+  });
+}
+
+function handleRoomDeleteMsg(
+  srv: HiveServer,
+  db: Db,
+  peerId: string,
+  msg: import('@shared/types.js').CliRoomDeleteMsg,
+): void {
+  if (!repos.isRoomMember(db, msg.roomId, peerId)) return;
+  repos.deleteRoomMessage(db, msg.roomId, msg.msgId, msg.ts);
+  const memberIds = repos.listRoomMembers(db, msg.roomId).map((m) => m.peerId);
+  srv.broadcastToMany(memberIds, {
+    type: 'roomDeleteMsg',
+    roomId: msg.roomId,
+    from: peerId,
+    msgId: msg.msgId,
+    ts: msg.ts,
   });
 }
 

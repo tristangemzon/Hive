@@ -71,6 +71,8 @@ export type SrvAnnounce = { type: 'announce'; text: string; ts: number };
 export type SrvReaction = { type: 'reaction'; from: string; msgId: string; emoji: string; added: boolean };
 // Room reaction relay — relay-only, not stored.
 export type SrvRoomReaction = { type: 'roomReaction'; roomId: string; from: string; msgId: string; emoji: string; added: boolean };
+export type SrvRoomEditMsg = { type: 'roomEditMsg'; roomId: string; from: string; msgId: string; ts: number; cipherB64: string };
+export type SrvRoomDeleteMsg = { type: 'roomDeleteMsg'; roomId: string; from: string; msgId: string; ts: number };
 // Ephemeral typing indicator — relayed only if recipient is online.
 export type SrvTyping = { type: 'typing'; from: string; typing: boolean };
 // Read receipt — relayed only if recipient is online.
@@ -104,6 +106,8 @@ export type ServerMessage =
   | SrvAnnounce
   | SrvReaction
   | SrvRoomReaction
+  | SrvRoomEditMsg
+  | SrvRoomDeleteMsg
   | SrvTyping
   | SrvReadReceipt
   | SrvRoomPin
@@ -167,6 +171,8 @@ export type CliUnreaction = { type: 'unreaction'; to: string; msgId: string; emo
 // Room reactions — relayed to online members only (not stored)
 export type CliRoomReaction = { type: 'roomReaction'; roomId: string; msgId: string; emoji: string };
 export type CliRoomUnreaction = { type: 'roomUnreaction'; roomId: string; msgId: string; emoji: string };
+export type CliRoomEditMsg = { type: 'roomEditMsg'; roomId: string; msgId: string; ts: number; cipherB64: string };
+export type CliRoomDeleteMsg = { type: 'roomDeleteMsg'; roomId: string; msgId: string; ts: number };
 // Ephemeral typing indicator — relay-only
 export type CliTyping = { type: 'typing'; to: string; typing: boolean };
 // Read receipt — relay-only
@@ -198,6 +204,8 @@ export type ClientMessage =
   | CliUnreaction
   | CliRoomReaction
   | CliRoomUnreaction
+  | CliRoomEditMsg
+  | CliRoomDeleteMsg
   | CliTyping
   | CliReadReceipt
   | CliRoomPin

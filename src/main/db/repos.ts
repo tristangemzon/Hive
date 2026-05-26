@@ -287,6 +287,16 @@ export function insertRoomMessage(
     .run(msgId, roomId, channelId, fromPeer, ts, cipherB64, Date.now());
 }
 
+export function editRoomMessage(db: Db, roomId: string, msgId: string, cipherB64: string, editedAt: number): void {
+  db.prepare('UPDATE room_messages SET cipher_b64 = ?, edited_at = ? WHERE room_id = ? AND msg_id = ?')
+    .run(cipherB64, editedAt, roomId, msgId);
+}
+
+export function deleteRoomMessage(db: Db, roomId: string, msgId: string, deletedAt: number): void {
+  db.prepare('UPDATE room_messages SET deleted_at = ? WHERE room_id = ? AND msg_id = ?')
+    .run(deletedAt, roomId, msgId);
+}
+
 export function listRoomHistory(
   db: Db,
   roomId: string,
