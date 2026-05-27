@@ -6,7 +6,7 @@
  * here; this module dispatches them and calls srv.send() / srv.broadcastToMany()
  * to reply.
  *
- * Binary voice/video relay is handled separately in handleBinaryFrame().
+ * Binary voice/video/screen relay is handled separately in handleBinaryFrame().
  */
 import type { HiveServer } from './ws.js';
 import type { Db } from '../db/open.js';
@@ -22,8 +22,8 @@ export function registerHandlers(srv: HiveServer, db: Db): void {
     }
   });
 
-  srv.on('binaryFrame', (buf: Buffer) => {
-    handleBinaryFrame(srv, buf);
+  srv.on('binaryFrame', (peerId: string, buf: Buffer) => {
+    handleBinaryFrame(srv, peerId, buf);
   });
 
   srv.on('disconnected', (peerId: string) => {
@@ -692,20 +692,23 @@ function handleRoomCategory(
 
 
 /**
- * Binary voice/video relay.
+ * Binary voice/video/screen relay.
  *
- * Frame format:
- *   [1 byte type: 0xA1=audio, 0xA2=video]
+ * Client → server frame format:
+ *   [1 byte type: 0xA1=audio, 0xA2=video, 0xA3=screen]
  *   [2 bytes LE: toPeerId length]
  *   [toPeerId UTF-8]
  *   [2 bytes LE: callId length]
  *   [callId UTF-8]
  *   [remaining bytes: encrypted media payload]
+ *
+ * Server → client rewrites the peer id field to fromPeerId so Buzz can apply
+ * the same active-call peer checks it uses for direct P2P talk streams.
  */
-function handleBinaryFrame(srv: HiveServer, buf: Buffer): void {
+function handleBinaryFrame(srv: HiveServer, fromPeerId: string, buf: Buffer): void {
   if (buf.length < 3) return;
   const type = buf[0];
-  if (type !== 0xa1 && type !== 0xa2) return;
+  if (type !== 0xa1 && type !== 0xa2 && type !== 0xa3) return;
 
   let offset = 1;
   if (buf.length < offset + 2) return;
@@ -719,9 +722,18 @@ function handleBinaryFrame(srv: HiveServer, buf: Buffer): void {
   const callIdLen = buf.readUInt16LE(offset);
   offset += 2;
   if (buf.length < offset + callIdLen) return;
+  const callId = buf.subarray(offset, offset + callIdLen);
   offset += callIdLen;
+  const payload = buf.subarray(offset);
 
-  // Relay the entire original buffer to the target (includes type + routing header +
-  // encrypted payload). The recipient's HiveClient will parse it the same way.
-  srv.sendBinary(toPeerId, buf);
+  const fromBytes = Buffer.from(fromPeerId, 'utf8');
+  const out = Buffer.allocUnsafe(1 + 2 + fromBytes.length + 2 + callId.length + payload.length);
+  let outOffset = 0;
+  out[outOffset++] = type;
+  out.writeUInt16LE(fromBytes.length, outOffset); outOffset += 2;
+  fromBytes.copy(out, outOffset); outOffset += fromBytes.length;
+  out.writeUInt16LE(callId.length, outOffset); outOffset += 2;
+  callId.copy(out, outOffset); outOffset += callId.length;
+  payload.copy(out, outOffset);
+  srv.sendBinary(toPeerId, out);
 }

@@ -2,10 +2,10 @@
  * Hive WebSocket server.
  *
  * Transport: WSS (WebSocket over HTTPS/TLS).
- * Protocol: JSON for control/chat messages, binary for voice/video relay.
+ * Protocol: JSON for control/chat messages, binary for voice/video/screen relay.
  *
- * Binary frame format for audio/video relay:
- *   [1 byte type: 0xA1=audio, 0xA2=video]
+ * Client → server binary frame format for audio/video/screen relay:
+ *   [1 byte type: 0xA1=audio, 0xA2=video, 0xA3=screen]
  *   [2 bytes LE: toPeerId length]
  *   [toPeerId UTF-8]
  *   [2 bytes LE: callId length]
@@ -31,7 +31,7 @@ export type ConnectionState =
 
 export interface HiveServerEvents {
   message: (peerId: string, msg: ClientMessage) => void;
-  binaryFrame: (buf: Buffer) => void;
+  binaryFrame: (peerId: string, buf: Buffer) => void;
   connected: (peerId: string) => void;
   disconnected: (peerId: string) => void;
   error: (err: Error) => void;
@@ -264,7 +264,7 @@ export class HiveServer extends EventEmitter {
     const state = this.sockets.get(ws);
     if (!state || state.phase !== 'authed') return;
     // Relay is handled by the handler layer; we just surface the raw buffer.
-    this.emit('binaryFrame', buf);
+    this.emit('binaryFrame', state.peerId, buf);
   }
 
   private onClose(ws: WebSocket): void {
