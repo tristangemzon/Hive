@@ -226,7 +226,7 @@ export type ClientMessage =
 
 // ── Shared entity types ──────────────────────────────────────────────────────
 
-export type UserStatus = 'online' | 'away' | 'idle' | 'invisible' | 'offline';
+export type UserStatus = 'online' | 'away' | 'idle' | 'dnd' | 'invisible' | 'offline';
 
 export type BuddyEntry = {
   peerId: string;
