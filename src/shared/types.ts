@@ -73,6 +73,10 @@ export type SrvReaction = { type: 'reaction'; from: string; msgId: string; emoji
 export type SrvRoomReaction = { type: 'roomReaction'; roomId: string; from: string; msgId: string; emoji: string; added: boolean };
 export type SrvRoomEditMsg = { type: 'roomEditMsg'; roomId: string; from: string; msgId: string; ts: number; cipherB64: string };
 export type SrvRoomDeleteMsg = { type: 'roomDeleteMsg'; roomId: string; from: string; msgId: string; ts: number };
+// 1:1 edit/delete relay. Relay-only for online recipients; offline edits are
+// best-effort (the original sealed message is still delivered on next auth).
+export type SrvEditMsg = { type: 'editMsg'; from: string; msgId: string; ts: number; cipherB64: string };
+export type SrvDeleteMsg = { type: 'deleteMsg'; from: string; msgId: string; ts: number };
 // Ephemeral typing indicator — relayed only if recipient is online.
 export type SrvTyping = { type: 'typing'; from: string; typing: boolean };
 // Read receipt — relayed only if recipient is online.
@@ -108,6 +112,8 @@ export type ServerMessage =
   | SrvRoomReaction
   | SrvRoomEditMsg
   | SrvRoomDeleteMsg
+  | SrvEditMsg
+  | SrvDeleteMsg
   | SrvTyping
   | SrvReadReceipt
   | SrvRoomPin
@@ -173,6 +179,9 @@ export type CliRoomReaction = { type: 'roomReaction'; roomId: string; msgId: str
 export type CliRoomUnreaction = { type: 'roomUnreaction'; roomId: string; msgId: string; emoji: string };
 export type CliRoomEditMsg = { type: 'roomEditMsg'; roomId: string; msgId: string; ts: number; cipherB64: string };
 export type CliRoomDeleteMsg = { type: 'roomDeleteMsg'; roomId: string; msgId: string; ts: number };
+// 1:1 edit/delete — relay-only.
+export type CliEditMsg = { type: 'editMsg'; to: string; msgId: string; ts: number; cipherB64: string };
+export type CliDeleteMsg = { type: 'deleteMsg'; to: string; msgId: string; ts: number };
 // Ephemeral typing indicator — relay-only
 export type CliTyping = { type: 'typing'; to: string; typing: boolean };
 // Read receipt — relay-only
@@ -206,6 +215,8 @@ export type ClientMessage =
   | CliRoomUnreaction
   | CliRoomEditMsg
   | CliRoomDeleteMsg
+  | CliEditMsg
+  | CliDeleteMsg
   | CliTyping
   | CliReadReceipt
   | CliRoomPin

@@ -59,6 +59,8 @@ function dispatch(srv: HiveServer, db: Db, peerId: string, msg: ClientMessage): 
     case 'roomUnreaction':   return handleRoomUnreaction(srv, db, peerId, msg);
     case 'roomEditMsg':      return handleRoomEditMsg(srv, db, peerId, msg);
     case 'roomDeleteMsg':    return handleRoomDeleteMsg(srv, db, peerId, msg);
+    case 'editMsg':          return handleEditMsg(srv, peerId, msg);
+    case 'deleteMsg':        return handleDeleteMsg(srv, peerId, msg);
     case 'typing':           return handleTyping(srv, peerId, msg);
     case 'readReceipt':      return handleReadReceipt(srv, peerId, msg);
     default:
@@ -583,6 +585,40 @@ function handleRoomDeleteMsg(
   srv.broadcastToMany(memberIds, {
     type: 'roomDeleteMsg',
     roomId: msg.roomId,
+    from: peerId,
+    msgId: msg.msgId,
+    ts: msg.ts,
+  });
+}
+
+// 1:1 edit/delete — relay-only. If the recipient is offline we silently drop;
+// the original sealed message is still delivered from the messages table on
+// next auth, so the recipient just won't see the edit/tombstone until the
+// sender edits again while they're online. Acceptable trade-off versus
+// adding edited_at/deleted_at columns + cipher rewriting in this release.
+function handleEditMsg(
+  srv: HiveServer,
+  peerId: string,
+  msg: import('@shared/types.js').CliEditMsg,
+): void {
+  if (!srv.connectedPeerIds.includes(msg.to)) return;
+  srv.send(msg.to, {
+    type: 'editMsg',
+    from: peerId,
+    msgId: msg.msgId,
+    ts: msg.ts,
+    cipherB64: msg.cipherB64,
+  });
+}
+
+function handleDeleteMsg(
+  srv: HiveServer,
+  peerId: string,
+  msg: import('@shared/types.js').CliDeleteMsg,
+): void {
+  if (!srv.connectedPeerIds.includes(msg.to)) return;
+  srv.send(msg.to, {
+    type: 'deleteMsg',
     from: peerId,
     msgId: msg.msgId,
     ts: msg.ts,
